@@ -1,6 +1,7 @@
 <div align="center"
     
-# 🏛️ Foncier Réunion
+## 🏛️ Foncier Réunion
+
 
 Monitoring territorial et analyse foncière des 24 communes de La Réunion (974). Un tableau de bord interactif, autonome et souverain pour suivre l'évolution de la fiscalité locale, des prix immobiliers et de la sécurité année après année.
 
@@ -19,6 +20,7 @@ Monitoring territorial et analyse foncière des 24 communes de La Réunion (974)
 ![Open Data](https://img.shields.io/badge/Open%20Data-DVF%20%7C%20DGFiP%20%7C%20INSEE-000091?style=flat-square)
 ![Status](https://img.shields.io/badge/Status-Active-success?style=flat-square)
 ![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg?style=flat-square)
+
 </div>
 
 ---
