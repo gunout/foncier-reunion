@@ -1,12 +1,25 @@
+<div align="center"
+    
 # 🏛️ Foncier Réunion
 
 Monitoring territorial et analyse foncière des 24 communes de La Réunion (974). Un tableau de bord interactif, autonome et souverain pour suivre l'évolution de la fiscalité locale, des prix immobiliers et de la sécurité année après année.
 
 ![Last commit](https://img.shields.io/github/last-commit/gunout/foncier-reunion?color=green&style=flat-square)
 ![Repo size](https://img.shields.io/github/repo-size/gunout/foncier-reunion?style=flat-square)
-![Language](https://img.shields.io/github/languages/top/gunout/foncier-reunion?style=flat-square)
+![Languages](https://img.shields.io/github/languages/top/gunout/foncier-reunion?style=flat-square)
+![Stars](https://img.shields.io/github/stars/gunout/foncier-reunion?style=flat-square&color=gold)
+![Forks](https://img.shields.io/github/forks/gunout/foncier-reunion?style=flat-square)
+![Issues](https://img.shields.io/github/issues/gunout/foncier-reunion?style=flat-square)
+![PRs](https://img.shields.io/github/issues-pr/gunout/foncier-reunion?style=flat-square)
+![License](https://img.shields.io/github/license/gunout/foncier-reunion?style=flat-square)
+![Made with France](https://img.shields.io/badge/Made%20in-La%20Réunion-00a95f?style=flat-square)
+![Design](https://img.shields.io/badge/Design-Charte%20Marianne-000091?style=flat-square)
 ![Chart.js](https://img.shields.io/badge/Chart.js-FF6384?style=flat-square&logo=chart.js&logoColor=white)
+![Vanilla JS](https://img.shields.io/badge/Vanilla%20JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
 ![Open Data](https://img.shields.io/badge/Open%20Data-DVF%20%7C%20DGFiP%20%7C%20INSEE-000091?style=flat-square)
+![Status](https://img.shields.io/badge/Status-Active-success?style=flat-square)
+![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg?style=flat-square)
+</div>
 
 ---
 
@@ -32,9 +45,22 @@ L'interface s'inspire de la **charte graphique de l'État (Marianne)** : sobrié
 
 ---
 
+## Stack Technique
+
+| Composant | Technologie | Badge |
+| :--- | :--- | :--- |
+| **Structure** | HTML5 sémantique | ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white) |
+| **Style** | CSS3 + Tailwind CSS | ![Tailwind](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white) |
+| **Logique** | Vanilla JavaScript (ES6+) | ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black) |
+| **Graphiques** | Chart.js v4 | ![Chart.js](https://img.shields.io/badge/Chart.js-FF6384?style=flat-square&logo=chart.js&logoColor=white) |
+| **Parsing CSV** | PapaParse v5 | ![PapaParse](https://img.shields.io/badge/PapaParse-5C8DBC?style=flat-square) |
+| **Design** | Charte Marianne (République Française) | ![Marianne](https://img.shields.io/badge/Charte-Marianne-000091?style=flat-square) |
+
+---
+
 ## Démarrage Rapide
 
-Aucune installation requise. Le fichier index.html est 100% autonome.
+Aucune installation requise. Le fichier index.html est 100% autonome (Tailwind, Chart.js et PapaParse sont chargés via CDN).
 
 ### Méthode 1 : Utilisation Locale
 
@@ -75,6 +101,8 @@ Puis ouvrez http://localhost:8000 dans votre navigateur.
 
 ## Source des Données
 
+Les données sont issues de l'**Open Data** officiel français :
+
 | Domaine | Source | Millésime |
 | :--- | :--- | :--- |
 | Fiscalité locale (TFPB, TEOM) | DGFiP - REI | 2002–2025 |
@@ -86,16 +114,6 @@ Puis ouvrez http://localhost:8000 dans votre navigateur.
 
 ---
 
-## Stack Technique
-
-- HTML5 / CSS3 (Tailwind CSS)
-- Vanilla JavaScript
-- Chart.js pour les graphiques
-- PapaParse pour le parsing CSV
-- Design : Charte Marianne
-
----
-
 ## Logique de fusion
 
 - Si vous chargez 2026.csv, les nouvelles lignes viennent s'ajouter.
@@ -104,7 +122,19 @@ Puis ouvrez http://localhost:8000 dans votre navigateur.
 
 ---
 
+## Feuille de Route
+
+- [x] Tableau de bord interactif (2025)
+- [x] Multi-fichiers CSV (2026)
+- [ ] Mode comparaison N communes
+- [ ] Export PDF des graphiques
+- [ ] Intégration des données de chômage
+
+---
+
 ## Contribution
+
+Les contributions sont les bienvenues ! Pour proposer une amélioration :
 
 1. Forkez le projet.
 2. Créez une branche (git checkout -b feature/amelioration).
@@ -112,12 +142,28 @@ Puis ouvrez http://localhost:8000 dans votre navigateur.
 4. Pushez.
 5. Ouvrez une Pull Request.
 
+Voir la liste des contributeurs : [CONTRIBUTORS.md](CONTRIBUTORS.md)
+
 ---
 
 ## Licence
 
-Ce projet est distribué sous licence MIT.
+Ce projet est distribué sous licence **MIT**. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
 
 ---
 
+## Remerciements
+
+- **DGFiP** pour les données fiscales.
+- **Cerema** pour les données DVF.
+- **INSEE** pour les données démographiques.
+- **SSMSI** pour les données de sécurité.
+- **La communauté Open Data française**.
+
+---
+<div align="center">
 Fait avec ❤️ pour La Réunion.
+
+**[⬆ Retour en haut](#-foncier-réunion)**
+</div>
+
