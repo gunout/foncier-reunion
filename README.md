@@ -2,6 +2,7 @@
     
 ## 🏛️ Foncier Réunion
 
+---
 
 Monitoring territorial et analyse foncière des 24 communes de La Réunion (974). Un tableau de bord interactif, autonome et souverain pour suivre l'évolution de la fiscalité locale, des prix immobiliers et de la sécurité année après année.
 
