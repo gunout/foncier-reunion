@@ -167,7 +167,7 @@ Ce projet est distribué sous licence **MIT**. Voir le fichier [LICENSE](LICENSE
 <div align="center">
 Fait avec ❤️ pour La Réunion.
 
-**[⬆ Retour en haut](#-foncier-réunion)**
+**[⬆ Retour en haut](#foncier-réunion)**
 
 </div>
 
