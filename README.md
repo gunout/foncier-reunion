@@ -1,6 +1,6 @@
-<div align="center"
+<div align="center">
     
-## 🏛️ Foncier Réunion
+# 🏛️ FONCIER REUNION
 
 ---
 
