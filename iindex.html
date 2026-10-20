@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foncier Réunion — Monitoring territorial 974</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --blue-france: #000091;
+            --blue-france-hi: #1212ff;
+            --blue-france-soft: #e3e3fd;
+            --red-marianne: #E1000F;
+            --red-marianne-soft: #ffe9e9;
+            --gold: #ffb800;
+            --green-bourgeon: #18753c;
+            --green-emeraude: #00a95f;
+            --white: #fff;
+            --grey-50: #f6f6f6;
+            --grey-100: #eee;
+            --grey-200: #e5e5e5;
+            --grey-500: #929292;
+            --grey-700: #3a3a3a;
+            --grey-900: #1e1e1e;
+            
+            --bg-app: #f6f6f6;
+            --bg-panel: #fff;
+            --border: #e5e5e5;
+            --text: #1e1e1e;
+            --text-muted: #929292;
+            
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+        }
+        
+        body {
+            background: var(--bg-app);
+            color: var(--text);
+            font-family: var(--font-sans);
+            font-size: 13px;
+        }
+
+        .marianne-band {
+            height: 6px;
+            background: linear-gradient(to right,
+                var(--blue-france) 0%, var(--blue-france) 33.33%,
+                var(--white) 33.33%, var(--white) 66.66%,
+                var(--red-marianne) 66.66%, var(--red-marianne) 100%);
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .panel.active-metric {
+            border-color: var(--blue-france);
+            box-shadow: 0 0 0 1px var(--blue-france);
+        }
+
+        .kpi {
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            border-left: 4px solid var(--blue-france);
+        }
+        .kpi:hover { background: var(--blue-france-soft); }
+        .kpi[data-metric="prix"] { border-left-color: var(--green-bourgeon); }
+        .kpi[data-metric="delinq"] { border-left-color: var(--red-marianne); }
+        .kpi[data-metric="teom"] { border-left-color: var(--gold); }
+
+        .led {
+            width: 8px; height: 8px; border-radius: 50%;
+            display: inline-block; box-shadow: 0 0 8px currentColor;
+        }
+
+        table th {
+            cursor: pointer; user-select: none;
+            color: var(--text-muted); text-transform: uppercase;
+            font-weight: 700; font-size: 10px; letter-spacing: 0.5px;
+        }
+        table th:hover { color: var(--blue-france); }
+        table td, table th {
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap; font-size: 0.75rem;
+        }
+        tbody tr:hover { background: var(--grey-50); }
+
+        .legend-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 10px; border-radius: 999px;
+            border: 1px solid var(--border);
+            font-size: 11px; font-family: var(--font-mono);
+            cursor: pointer; transition: all 0.2s;
+            background: var(--bg-panel); color: var(--text);
+        }
+        .legend-pill:hover { border-color: var(--blue-france); }
+        .legend-pill.inactive { opacity: 0.4; text-decoration: line-through; border-style: dashed; }
+        .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+        .trend-up { color: var(--green-bourgeon); }
+        .trend-down { color: var(--red-marianne); }
+
+        #drop-zone {
+            border: 2px dashed var(--border);
+            transition: all 0.2s; cursor: pointer;
+            background: var(--bg-panel);
+        }
+        #drop-zone.dragover {
+            border-color: var(--blue-france);
+            background: var(--blue-france-soft);
+        }
+
+        select, input {
+            background: var(--bg-panel); border: 1px solid var(--border);
+            color: var(--text); border-radius: 4px;
+            padding: 0.5rem 0.8rem;
+            font-family: var(--font-sans); font-size: 12px;
+        }
+        select:focus, input:focus {
+            outline: none; border-color: var(--blue-france);
+            box-shadow: 0 0 0 2px var(--blue-france-soft);
+        }
+
+        .btn-primary {
+            background: var(--blue-france); color: #fff;
+            border: 1px solid var(--blue-france);
+            font-weight: 700; border-radius: 4px;
+            transition: all .15s; font-family: var(--font-sans); cursor: pointer;
+        }
+        .btn-primary:hover { background: var(--blue-france-hi); }
+
+        .btn-outline {
+            background: transparent; color: var(--text);
+            border: 1px solid var(--border); font-weight: 600;
+            border-radius: 4px; transition: all .15s; cursor: pointer;
+        }
+        .btn-outline:hover { border-color: var(--blue-france); color: var(--blue-france); background: var(--blue-france-soft); }
+
+        .scroll::-webkit-scrollbar { height: 8px; width: 8px; }
+        .scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <div class="marianne-band"></div>
+
+    <header class="sticky top-0 z-20 border-b bg-[var(--bg-panel)] shadow-sm" style="border-color: var(--border);">
+        <div class="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="flex flex-col leading-tight pr-4" style="border-right: 1px solid var(--border);">
+                    <span class="text-[13px] font-bold uppercase tracking-wider" style="color: var(--text);">République<br>Française</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="mono text-xs px-2 py-1 rounded font-bold bg-[var(--blue-france)] text-white">FONCIER</span>
+                    <span class="text-sm font-bold" style="color: var(--blue-france);">Réunion</span>
+                    <span class="text-xs" style="color: var(--text-muted);">Monitoring territorial · 974</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 text-xs mono">
+                <button id="btn-reset" class="btn-outline px-3 py-1.5">Réinitialiser</button>
+                <button id="btn-export" class="btn-outline px-3 py-1.5 hidden">Exporter CSV</button>
+                <span class="flex items-center gap-2 px-3 py-1.5 rounded" style="background: var(--grey-50); border: 1px solid var(--border);">
+                    <span class="led" id="status-led" style="background: var(--gold); color: var(--gold);"></span>
+                    <span id="status-text" style="color: var(--text-muted);">En attente...</span>
+                </span>
+                <span style="color: var(--text-muted);" id="clock">--:--:--</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1600px] mx-auto px-6 py-6 space-y-5 flex-1 w-full" id="main-content" style="display:none;">
+        
+        <div class="flex flex-wrap items-center justify-between gap-4 p-4 rounded-lg" style="background: var(--bg-panel); border: 1px solid var(--border);">
+            <div class="flex flex-wrap items-center gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider mb-1" style="color: var(--text-muted);">Commune 1</label>
+                    <select id="f-commune1" class="mono"><option value="">TOUTES</option></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider mb-1" style="color: var(--text-muted);">Commune 2</label>
+                    <select id="f-commune2" class="mono"><option value="">AUCUNE</option></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider mb-1" style="color: var(--text-muted);">Année (Tableau)</label>
+                    <select id="f-annee" class="mono"></select>
+                </div>
+            </div>
+            <div class="flex flex-col items-end">
+                <label class="block text-[10px] font-bold uppercase tracking-wider mb-1" style="color: var(--text-muted);">Période (Graphiques)</label>
+                <div class="flex items-center gap-2 text-xs mono">
+                    <span id="lbl-min">—</span>
+                    <input type="range" id="f-year-min" min="2002" max="2025" step="1" class="w-24 accent-[var(--blue-france)]">
+                    <span style="color: var(--text-muted);">-</span>
+                    <input type="range" id="f-year-max" min="2002" max="2025" step="1" class="w-24 accent-[var(--blue-france)]">
+                    <span id="lbl-max">—</span>
+                </div>
+            </div>
+        </div>
+
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="panel kpi p-4" data-metric="tfpb">
+                <p class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--text-muted);">TFPB moyen</p>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <p class="text-3xl font-extrabold" style="color: var(--blue-france);" id="k-tfpb">—</p>
+                    <span class="text-xs font-bold mono" id="k-tfpb-trend"></span>
+                </div>
+            </div>
+            <div class="panel kpi p-4" data-metric="prix">
+                <p class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--text-muted);">Prix médian maison</p>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <p class="text-3xl font-extrabold" style="color: var(--green-bourgeon);" id="k-prix">—</p>
+                    <span class="text-xs font-bold mono" id="k-prix-trend"></span>
+                </div>
+            </div>
+            <div class="panel kpi p-4" data-metric="delinq">
+                <p class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--text-muted);">Délinquance /1000</p>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <p class="text-3xl font-extrabold" style="color: var(--red-marianne);" id="k-delinq">—</p>
+                    <span class="text-xs font-bold mono" id="k-delinq-trend"></span>
+                </div>
+            </div>
+            <div class="panel kpi p-4" data-metric="teom">
+                <p class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--text-muted);">TEOM moyen</p>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <p class="text-3xl font-extrabold" style="color: #8a5e00;" id="k-teom">—</p>
+                    <span class="text-xs font-bold mono" id="k-teom-trend"></span>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="panel lg:col-span-2 p-4 flex flex-col">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider" style="color: var(--text-muted);" id="main-chart-title">Sélectionnez un indicateur</h2>
+                    <span class="led" style="background: var(--blue-france); color: var(--blue-france);"></span>
+                </div>
+                <div id="main-legend" class="flex flex-wrap gap-2 mb-3 min-h-[28px]"></div>
+                <div class="flex-1 min-h-[280px]"><canvas id="c-main"></canvas></div>
+            </div>
+            
+            <div class="panel p-4 flex flex-col">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider" style="color: var(--text-muted);">Classement TFPB</h2>
+                    <span class="led" style="background: var(--gold); color: var(--gold);"></span>
+                </div>
+                <div class="flex-1 min-h-[280px]"><canvas id="c-rank"></canvas></div>
+            </div>
+        </section>
+
+        <section class="panel overflow-hidden">
+            <div class="px-4 py-3 flex items-center justify-between border-b" style="border-color: var(--border); background: var(--grey-50);">
+                <h2 class="text-xs font-bold uppercase tracking-wider" style="color: var(--text-muted);">Données brutes — <span id="t-count">0</span> lignes</h2>
+                <input id="f-search" placeholder="Rechercher une commune..." class="mono text-xs w-64">
+            </div>
+            <div class="overflow-x-auto scroll max-h-[500px]">
+                <table class="w-full text-left mono">
+                    <thead class="sticky top-0" style="background: var(--bg-panel);">
+                        <tr>
+                            <th data-sort="annee">Année <span class="sort-icon">↕</span></th>
+                            <th data-sort="commune">Commune <span class="sort-icon">↕</span></th>
+                            <th>INSEE</th>
+                            <th data-sort="tfpb">TFPB (%) <span class="sort-icon">↕</span></th>
+                            <th data-sort="teom">TEOM (%) <span class="sort-icon">↕</span></th>
+                            <th data-sort="prix">Prix M. (€) <span class="sort-icon">↕</span></th>
+                            <th data-sort="delinq">Délinq. (‰) <span class="sort-icon">↕</span></th>
+                            <th>Tendance 5 ans (TFPB)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <div id="loader" class="flex-1 flex items-center justify-center p-6">
+        <div class="panel p-8 max-w-lg w-full text-center" id="drop-zone">
+            <div class="text-4xl mb-4">📁</div>
+            <h2 class="text-lg font-bold mb-2" style="color: var(--blue-france);">Foncier Réunion</h2>
+            <p class="text-sm mb-4" style="color: var(--text-muted);">
+                Glissez-déposez un ou plusieurs fichiers CSV (ex: <code>reunion_habity.csv</code>, <code>2026.csv</code>).<br>
+                Ou cliquez sur le bouton ci-dessous.
+            </p>
+            <input type="file" id="file-input" accept=".csv" multiple class="hidden">
+            <button onclick="document.getElementById('file-input').click()" class="btn-primary px-4 py-2 text-sm">Sélectionner des fichiers CSV</button>
+            <div class="mt-4 pt-4 border-t" style="border-color: var(--border);">
+                <p class="text-xs mb-2" style="color: var(--text-muted);">Si <code>reunion_habity.csv</code> est à la racine, il se chargera automatiquement.</p>
+                <button id="btn-reload" class="btn-outline px-4 py-2 text-xs">🔄 Recharger les fichiers locaux</button>
+            </div>
+            <div class="mt-6 pt-4 border-t text-xs" style="border-color: var(--border); color: var(--text-muted);">
+                Source des données : DGFiP, INSEE, SSMSI, DVF · Millésimes 2002–2025
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let DATA = [];
+        let charts = {};
+        let communesMap = {};
+        let currentMetric = 'tfpb';
+        let sortConfig = { key: 'annee', direction: 'desc' };
+        let hiddenSeries = new Set();
+        
+        const COLORS = ['#000091', '#E1000F', '#18753c', '#ffb800', '#a855f7', '#06b6d4', '#f97316', '#6366f1'];
+        const gridOpts = { color: '#e5e5e5' };
+        const baseOpts = {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1e1e1e', borderColor: '#3a3a3a', borderWidth: 1,
+                    titleFont: { family: 'JetBrains Mono', size: 11 }, 
+                    bodyFont: { family: 'JetBrains Mono', size: 11 },
+                    padding: 10, displayColors: true
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#929292', font: { family: 'JetBrains Mono', size: 10 } }, grid: gridOpts },
+                y: { ticks: { color: '#929292', font: { family: 'JetBrains Mono', size: 10 } }, grid: gridOpts }
+            }
+        };
+
+        // --- CHARGEMENT ---
+        async function loadData() {
+            try {
+                const response = await fetch('reunion_habity.csv');
+                if (!response.ok) throw new Error('Fichier non trouvé');
+                const csvText = await response.text();
+                processCSV(csvText);
+            } catch (error) {
+                console.warn("Échec du chargement automatique. Glissez-déposez le fichier CSV.", error);
+            }
+        }
+
+        function processCSV(csvText) {
+            Papa.parse(csvText, {
+                header: true, skipEmptyLines: true, dynamicTyping: false,
+                complete: function(results) {
+                    if (results.data.length === 0) return alert("Fichier vide.");
+                    
+                    const newData = results.data.map(row => {
+                        let insee = row.code_insee ? row.code_insee.trim() : '';
+                        if (insee.length === 6 && insee.startsWith('9740')) insee = '974' + insee.slice(4);
+                        
+                        const parseNum = (val) => {
+                            if (!val || val === '.' || val === 'NA') return null;
+                            const parsed = parseFloat(val);
+                            return isNaN(parsed) ? null : parsed;
+                        };
+
+                        return {
+                            annee: parseInt(row.annee),
+                            commune: row.commune.trim(),
+                            insee: insee,
+                            tfpb: parseNum(row.tfpk_communal),
+                            teom: parseNum(row.teom),
+                            prix: parseNum(row.prix_median_m2_maison),
+                            ventes: parseNum(row.nb_ventes_maison),
+                            delinq: parseNum(row.taux_pour_mille_delinquance)
+                        };
+                    }).filter(r => r.commune && !isNaN(r.annee));
+
+                    // Fusionner avec les données existantes (gérer les doublons)
+                    const merged = [...DATA];
+                    newData.forEach(newRow => {
+                        const idx = merged.findIndex(r => r.annee === newRow.annee && r.insee === newRow.insee);
+                        if (idx >= 0) merged[idx] = newRow;
+                        else merged.push(newRow);
+                    });
+                    
+                    DATA = merged;
+                    initDashboard();
+                }
+            });
+        }
+
+        // --- INITIALISATION ---
+        function initDashboard() {
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+            document.getElementById('btn-export').style.display = 'inline-block';
+            document.getElementById('status-text').textContent = `${DATA.length} lignes`;
+            document.getElementById('status-led').style.background = 'var(--green-emeraude)';
+            document.getElementById('status-led').style.color = 'var(--green-emeraude)';
+            
+            communesMap = {};
+            DATA.forEach(r => {
+                if (!communesMap[r.insee] || r.annee > communesMap[r.insee].annee) {
+                    communesMap[r.insee] = { insee: r.insee, nom: r.commune, annee: r.annee };
+                }
+            });
+            const communesUniques = Object.values(communesMap).sort((a, b) => a.nom.localeCompare(b.nom));
+            const annees = [...new Set(DATA.map(r=>r.annee))].sort((a,b)=>a-b);
+
+            ['f-commune1', 'f-commune2'].forEach((id, index) => {
+                const sel = document.getElementById(id);
+                sel.innerHTML = index === 0 ? '<option value="">TOUTES</option>' : '<option value="">AUCUNE</option>';
+                communesUniques.forEach(c => sel.add(new Option(c.nom, c.insee)));
+            });
+
+            const selA = document.getElementById('f-annee');
+            selA.innerHTML = '';
+            annees.forEach(a => selA.add(new Option(a, a)));
+            selA.value = annees[annees.length - 1];
+
+            const yMin = document.getElementById('f-year-min');
+            const yMax = document.getElementById('f-year-max');
+            yMin.min = yMax.min = annees[0];
+            yMin.max = yMax.max = annees[annees.length - 1];
+            yMin.value = annees[0];
+            yMax.value = annees[annees.length - 1];
+            updateYearLabels();
+
+            ['f-commune1', 'f-commune2', 'f-annee'].forEach(id => {
+                document.getElementById(id).addEventListener('change', refresh);
+            });
+            document.getElementById('f-search').addEventListener('input', renderTable);
+            
+            yMin.addEventListener('input', () => { enforceSliderOrder(yMin, yMax); updateYearLabels(); renderCharts(); });
+            yMax.addEventListener('input', () => { enforceSliderOrder(yMax, yMin); updateYearLabels(); renderCharts(); });
+
+            document.querySelectorAll('.kpi').forEach(card => {
+                card.addEventListener('click', function() {
+                    document.querySelectorAll('.kpi').forEach(c => c.classList.remove('active-metric'));
+                    this.classList.add('active-metric');
+                    currentMetric = this.dataset.metric;
+                    renderCharts();
+                });
+            });
+            document.querySelector(`.kpi[data-metric="${currentMetric}"]`).classList.add('active-metric');
+
+            document.querySelectorAll('th[data-sort]').forEach(th => {
+                th.addEventListener('click', () => {
+                    const key = th.dataset.sort;
+                    if (sortConfig.key === key) {
+                        sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        sortConfig.key = key;
+                        sortConfig.direction = 'desc';
+                    }
+                    renderTable();
+                });
+            });
+
+            document.getElementById('btn-export').addEventListener('click', exportCSV);
+            document.getElementById('btn-reset').addEventListener('click', resetFilters);
+            document.getElementById('btn-reload').addEventListener('click', () => {
+                DATA = [];
+                loadData();
+            });
+
+            refresh();
+        }
+
+        function resetFilters() {
+            document.getElementById('f-commune1').value = '';
+            document.getElementById('f-commune2').value = '';
+            const annees = [...new Set(DATA.map(r=>r.annee))].sort((a,b)=>a-b);
+            document.getElementById('f-annee').value = annees[annees.length - 1];
+            document.getElementById('f-year-min').value = annees[0];
+            document.getElementById('f-year-max').value = annees[annees.length - 1];
+            document.getElementById('f-search').value = '';
+            hiddenSeries.clear();
+            updateYearLabels();
+            refresh();
+        }
+
+        function enforceSliderOrder(slider, otherSlider) {
+            const val = parseInt(slider.value);
+            const otherVal = parseInt(otherSlider.value);
+            if (slider.id === 'f-year-min' && val > otherVal) otherSlider.value = val;
+            if (slider.id === 'f-year-max' && val < otherVal) otherSlider.value = val;
+        }
+
+        function updateYearLabels() {
+            document.getElementById('lbl-min').textContent = document.getElementById('f-year-min').value;
+            document.getElementById('lbl-max').textContent = document.getElementById('f-year-max').value;
+        }
+
+        function currentTableFiltered() {
+            const c = document.getElementById('f-commune1').value;
+            const a = document.getElementById('f-annee').value;
+            const q = document.getElementById('f-search').value.toLowerCase();
+            let filtered = DATA.filter(r => 
+                (!c || r.insee === c) && 
+                (!a || r.annee == a) && 
+                (!q || r.commune.toLowerCase().includes(q))
+            );
+            
+            filtered.sort((a, b) => {
+                let valA = a[sortConfig.key];
+                let valB = b[sortConfig.key];
+                if (valA == null) return 1;
+                if (valB == null) return -1;
+                if (typeof valA === 'string') return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+            });
+            return filtered;
+        }
+
+        // --- RENDU ---
+        function refresh() {
+            renderKPI(); 
+            renderCharts(); 
+            renderTable();
+        }
+
+        function avg(arr, key) {
+            const v = arr.map(r => r[key]).filter(x => x != null);
+            return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
+        }
+
+        function fmt(n, d=2) {
+            return n == null ? '—' : Number(n).toLocaleString('fr-FR', {maximumFractionDigits: d});
+        }
+
+        function renderKPI() {
+            const c = document.getElementById('f-commune1').value;
+            const a = parseInt(document.getElementById('f-annee').value);
+            
+            let rows = DATA.filter(r => (!c || r.insee === c) && r.annee == a);
+            const prevYears = [...new Set(DATA.map(r=>r.annee))].filter(y => y < a).sort((x,y)=>y-x);
+            const prevYear = prevYears.length ? prevYears[0] : null;
+            let prevRows = prevYear ? DATA.filter(r => (!c || r.insee === c) && r.annee == prevYear) : [];
+
+            const tfpb = avg(rows, 'tfpb'), prix = avg(rows, 'prix'), del = avg(rows, 'delinq'), teom = avg(rows, 'teom');
+            const prevTfpb = avg(prevRows, 'tfpb'), prevPrix = avg(prevRows, 'prix'), prevDel = avg(prevRows, 'delinq'), prevTeom = avg(prevRows, 'teom');
+            
+            document.getElementById('k-tfpb').textContent = tfpb != null ? fmt(tfpb) + ' %' : '—';
+            document.getElementById('k-prix').textContent = prix != null ? fmt(prix, 0) + ' €/m²' : '—';
+            document.getElementById('k-delinq').textContent = del != null ? fmt(del) + ' ‰' : '—';
+            document.getElementById('k-teom').textContent = teom != null ? fmt(teom) + ' %' : '—';
+
+            const renderTrend = (elId, current, prev) => {
+                const el = document.getElementById(elId);
+                if (current == null || prev == null) { el.textContent = ''; return; }
+                const delta = current - prev;
+                const pct = (delta / prev) * 100;
+                if (Math.abs(pct) < 0.1) { el.innerHTML = '<span style="color: var(--text-muted);">→ stable</span>'; return; }
+                const isUp = delta > 0;
+                el.innerHTML = `<span class="${isUp ? 'trend-up' : 'trend-down'}">${isUp ? '↑' : '↓'} ${fmt(Math.abs(pct), 1)}%</span>`;
+            };
+            renderTrend('k-tfpb-trend', tfpb, prevTfpb);
+            renderTrend('k-prix-trend', prix, prevPrix);
+            renderTrend('k-delinq-trend', del, prevDel);
+            renderTrend('k-teom-trend', teom, prevTeom);
+        }
+
+        function seriesFor(key) {
+            const c1 = document.getElementById('f-commune1').value;
+            const c2 = document.getElementById('f-commune2').value;
+            const minYear = parseInt(document.getElementById('f-year-min').value);
+            const maxYear = parseInt(document.getElementById('f-year-max').value);
+            const annees = [...new Set(DATA.map(r=>r.annee))].filter(a => a >= minYear && a <= maxYear).sort((a,b)=>a-b);
+            
+            let datasets = [];
+            
+            const createDataset = (insee, colorIndex) => {
+                const nom = communesMap[insee] ? communesMap[insee].nom : 'Inconnue';
+                return {
+                    label: nom,
+                    insee: insee,
+                    data: annees.map(a => {
+                        const r = DATA.find(x => x.insee === insee && x.annee == a);
+                        return r ? r[key] : null;
+                    }),
+                    borderColor: COLORS[colorIndex % COLORS.length],
+                    backgroundColor: COLORS[colorIndex % COLORS.length],
+                    tension: 0.35, pointRadius: 3, borderWidth: 2, spanGaps: true
+                };
+            };
+
+            if (c1) {
+                datasets.push(createDataset(c1, 0));
+            } else {
+                Object.values(communesMap).sort((a,b)=>a.nom.localeCompare(b.nom)).slice(0, 4).forEach((c, i) => {
+                    datasets.push(createDataset(c.insee, i));
+                });
+            }
+
+            if (c2) {
+                datasets.push(createDataset(c2, 1));
+            }
+
+            return { annees, datasets };
+        }
+
+        function renderLegend(datasets) {
+            const container = document.getElementById('main-legend');
+            container.innerHTML = '';
+            datasets.forEach(ds => {
+                const isHidden = hiddenSeries.has(ds.insee);
+                const pill = document.createElement('div');
+                pill.className = `legend-pill ${isHidden ? 'inactive' : ''}`;
+                pill.innerHTML = `<span class="legend-dot" style="background:${ds.borderColor}"></span> ${ds.label}`;
+                pill.addEventListener('click', () => {
+                    if (hiddenSeries.has(ds.insee)) hiddenSeries.delete(ds.insee);
+                    else hiddenSeries.add(ds.insee);
+                    renderCharts();
+                });
+                container.appendChild(pill);
+            });
+        }
+
+        function renderCharts() {
+            Object.values(charts).forEach(c => c.destroy());
+            
+            const { annees, datasets } = seriesFor(currentMetric);
+            const visibleDatasets = datasets.filter(ds => !hiddenSeries.has(ds.insee));
+            
+            const metricNames = { tfpb: 'TFPB (%)', prix: 'Prix Médian Maison (€/m²)', delinq: 'Délinquance (‰)', teom: 'TEOM (%)' };
+            document.getElementById('main-chart-title').textContent = `Évolution : ${metricNames[currentMetric]}`;
+
+            renderLegend(datasets);
+
+            charts.main = new Chart(document.getElementById('c-main'), {
+                type: 'line',
+                data: { labels: annees, datasets: visibleDatasets },
+                options: baseOpts
+            });
+
+            const a = document.getElementById('f-annee').value;
+            const rankMap = {};
+            DATA.filter(r => r.annee == a && r.tfpb != null).forEach(r => {
+                if (!rankMap[r.insee] || r.annee > rankMap[r.insee].annee) rankMap[r.insee] = r;
+            });
+            const rank = Object.values(rankMap).sort((x,y) => y.tfpb - x.tfpb);
+            
+            charts.rank = new Chart(document.getElementById('c-rank'), {
+                type: 'bar',
+                data: {
+                    labels: rank.map(r=>r.commune),
+                    datasets: [{
+                        data: rank.map(r=>r.tfpb),
+                        backgroundColor: rank.map((_, i) => i === 0 ? '#E1000F' : i < 3 ? '#ffb800' : '#000091'),
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    ...baseOpts, indexAxis: 'y',
+                    plugins: { ...baseOpts.plugins, legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#929292', font: { family: 'JetBrains Mono', size: 10 } }, grid: gridOpts },
+                        y: { ticks: { color: '#3a3a3a', font: { family: 'JetBrains Mono', size: 10 } }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function generateSparkline(data, color) {
+            if (!data || data.length < 2) return '—';
+            const validData = data.filter(d => d != null);
+            if (validData.length < 2) return '—';
+            
+            const min = Math.min(...validData);
+            const max = Math.max(...validData);
+            const range = max - min || 1;
+            const width = 60;
+            const height = 20;
+            const step = width / (validData.length - 1);
+            
+            let path = `M 0 ${height - ((validData[0] - min) / range) * height}`;
+            for (let i = 1; i < validData.length; i++) {
+                const x = i * step;
+                const y = height - ((validData[i] - min) / range) * height;
+                path += ` L ${x} ${y}`;
+            }
+            
+            const trendColor = validData[validData.length - 1] >= validData[0] ? '#18753c' : '#E1000F';
+            
+            return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="overflow:visible">
+                <path d="${path}" fill="none" stroke="${trendColor}" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="${width}" cy="${height - ((validData[validData.length - 1] - min) / range) * height}" r="2" fill="${trendColor}"/>
+            </svg>`;
+        }
+
+        function renderTable() {
+            const rows = currentTableFiltered();
+            document.getElementById('t-count').textContent = rows.length;
+            
+            document.getElementById('tbody').innerHTML = rows.map(r => {
+                const sparkData = [];
+                const annees = [...new Set(DATA.map(x=>x.annee))].sort((a,b)=>a-b);
+                const last5 = annees.slice(-5);
+                last5.forEach(a => {
+                    const match = DATA.find(x => x.insee === r.insee && x.annee == a);
+                    sparkData.push(match ? match.tfpb : null);
+                });
+
+                return `
+                <tr>
+                    <td style="color: var(--text-muted);">${r.annee}</td>
+                    <td style="font-weight: 600;">${r.commune}</td>
+                    <td style="color: var(--text-muted);">${r.insee}</td>
+                    <td style="color: var(--blue-france); font-weight: 700;">${fmt(r.tfpb)} %</td>
+                    <td style="color: #8a5e00; font-weight: 700;">${fmt(r.teom)} %</td>
+                    <td style="color: var(--green-bourgeon); font-weight: 700;">${r.prix ? fmt(r.prix, 0) + ' €' : '—'}</td>
+                    <td style="color: var(--red-marianne); font-weight: 700;">${fmt(r.delinq)} ‰</td>
+                    <td>${generateSparkline(sparkData, r.tfpb)}</td>
+                </tr>`;
+            }).join('') || `<tr><td colspan="8" class="text-center py-6" style="color: var(--text-muted);">Aucun résultat</td></tr>`;
+        }
+
+        function exportCSV() {
+            const rows = currentTableFiltered();
+            if (rows.length === 0) return alert("Aucune donnée à exporter.");
+            const headers = ["Annee", "Commune", "INSEE", "TFPB", "TEOM", "Prix_Median_Maison", "Ventes_Maison", "Taux_Delinquance"];
+            const csvRows = [headers.join(',')];
+            rows.forEach(r => {
+                csvRows.push([r.annee, `"${r.commune}"`, r.insee, r.tfpb ?? '', r.teom ?? '', r.prix ?? '', r.ventes ?? '', r.delinq ?? ''].join(','));
+            });
+            const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvRows.join("\n");
+            const link = document.createElement("a");
+            link.setAttribute("href", encodeURI(csvContent));
+            link.setAttribute("download", "extraction_foncier_reunion.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- DRAG & DROP MULTI-FICHIERS ---
+        const dropZone = document.getElementById('drop-zone');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+        });
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        });
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+        document.getElementById('file-input').addEventListener('change', function() {
+            handleFiles(this.files);
+        });
+
+        function handleFiles(files) {
+            if (!files || !files.length) return;
+            const csvFiles = [...files].filter(f => f.name.endsWith('.csv'));
+            if (!csvFiles.length) return alert("Aucun fichier CSV détecté.");
+            
+            document.getElementById('status-text').textContent = `Chargement de ${csvFiles.length} fichier(s)...`;
+            document.getElementById('status-led').style.background = 'var(--gold)';
+            document.getElementById('status-led').style.color = 'var(--gold)';
+
+            let loadedCount = 0;
+            csvFiles.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    processCSV(e.target.result);
+                    loadedCount++;
+                    if (loadedCount === csvFiles.length) {
+                        document.getElementById('status-text').textContent = `${DATA.length} lignes`;
+                        document.getElementById('status-led').style.background = 'var(--green-emeraude)';
+                        document.getElementById('status-led').style.color = 'var(--green-emeraude)';
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        setInterval(() => { document.getElementById('clock').textContent = new Date().toLocaleTimeString('fr-FR'); }, 1000);
+        
+        // Démarrage automatique
+        loadData();
+    </script>
+</body>
+</html>
