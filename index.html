@@ -991,36 +991,93 @@
         }
         function fmt(n, d=2) { return n == null ? '—' : Number(n).toLocaleString('fr-FR', {maximumFractionDigits: d}); }
 
+        const SUM_METRICS = new Set(['population', 'faits', 'ecoles', 'sport', 'bpe', 'ventes', 'ventes_appart']);
+
+        function lastKnownValue(insee, key, maxYear) {
+            const rows = DATA.filter(r =>
+                (!insee || r.insee === insee) &&
+                r.annee <= maxYear &&
+                r[key] != null
+            );
+            if (!rows.length) return null;
+            const bestYear = Math.max(...rows.map(r => r.annee));
+            return rows.filter(r => r.annee === bestYear);
+        }
+
+        function aggregate(rows, key) {
+            const vals = rows.map(r => r[key]).filter(x => x != null);
+            if (!vals.length) return null;
+            if (SUM_METRICS.has(key)) return vals.reduce((s, x) => s + x, 0);
+            return vals.reduce((s, x) => s + x, 0) / vals.length;
+        }
+
+        function previousYearWithData(insee, key, beforeYear) {
+            const years = [...new Set(
+                DATA.filter(r =>
+                    (!insee || r.insee === insee) &&
+                    r[key] != null &&
+                    r.annee < beforeYear
+                ).map(r => r.annee)
+            )];
+            return years.length ? Math.max(...years) : null;
+        }
+
         function renderKPI() {
             const c = document.getElementById('f-commune1').value;
             const a = parseInt(document.getElementById('f-annee').value);
             let rows = DATA.filter(r => (!c || r.insee === c) && r.annee == a);
-            const prevYears = [...new Set(DATA.map(r=>r.annee))].filter(y => y < a).sort((x,y)=>y-x);
-            const prevYear = prevYears.length ? prevYears[0] : null;
-            let prevRows = prevYear ? DATA.filter(r => (!c || r.insee === c) && r.annee == prevYear) : [];
 
-            const set = (id, trendId, key, unit, dec=2) => {
-                const cur = avg(rows, key), prev = avg(prevRows, key);
-                document.getElementById(id).textContent = cur != null ? fmt(cur, dec) + (unit ? ' ' + unit : '') : '—';
-                const el = document.getElementById(trendId);
-                if (!el) return;
-                if (cur == null || prev == null) { el.textContent = ''; return; }
+            const set = (id, trendId, key, unit, dec = 2) => {
+                const el = document.getElementById(id);
+                const trendEl = document.getElementById(trendId);
+                let cur = aggregate(rows, key);
+                let curYear = a;
+                let isFallback = false;
+                if (cur == null) {
+                    const fb = lastKnownValue(c, key, a);
+                    if (fb) { cur = aggregate(fb, key); curYear = fb[0].annee; isFallback = true; }
+                }
+                if (cur == null) { el.textContent = '\u2014'; el.title = 'Donnee non renseignee (' + key + ')'; }
+                else {
+                    el.textContent = fmt(cur, dec) + (unit ? ' ' + unit : '');
+                    el.title = isFallback ? 'Valeur ' + curYear + ' (non renseignee pour ' + a + ')' : 'Valeur ' + curYear;
+                }
+                if (!trendEl) return;
+                if (cur == null) { trendEl.textContent = ''; return; }
+                const prevYear = previousYearWithData(c, key, curYear);
+                if (prevYear == null) { trendEl.textContent = ''; return; }
+                const prevRows = DATA.filter(r => (!c || r.insee === c) && r.annee === prevYear && r[key] != null);
+                const prev = aggregate(prevRows, key);
+                if (prev == null || prev === 0) { trendEl.textContent = ''; return; }
                 const pct = ((cur - prev) / prev) * 100;
-                if (Math.abs(pct) < 0.1) { el.innerHTML = '<span style="color:var(--text-muted)">→</span>'; return; }
-                el.innerHTML = `<span class="${pct > 0 ? 'trend-up' : 'trend-down'}">${pct > 0 ? '↑' : '↓'} ${fmt(Math.abs(pct), 1)}%</span>`;
+                if (Math.abs(pct) < 0.1) {
+                    trendEl.innerHTML = '<span style="color:var(--text-muted)">\u2192</span>';
+                    trendEl.title = 'Stable vs ' + prevYear;
+                    return;
+                }
+                trendEl.innerHTML = '<span class="' + (pct > 0 ? 'trend-up' : 'trend-down') + '">' + (pct > 0 ? '\u2191' : '\u2193') + ' ' + fmt(Math.abs(pct), 1) + '%</span>';
+                trendEl.title = 'vs ' + prevYear + ' (' + fmt(prev, dec) + (unit ? ' ' + unit : '') + ')';
             };
-            set('k-tfpb', 'k-tfpb-trend', 'tfpb', '%');
-            set('k-prix', 'k-prix-trend', 'prix', '€/m²', 0);
-            set('k-delinq', 'k-delinq-trend', 'delinq', '‰');
-            set('k-teom', 'k-teom-trend', 'teom', '%');
-            set('k-revenu', 'k-revenu-trend', 'revenu', '€', 0);
-            set('k-pop', 'k-pop-trend', 'population', '', 0);
-            set('k-fibre', 'k-fibre-trend', 'fibre', '%', 1);
-            set('k-prix-appart', 'k-prix-appart-trend', 'prix_appart', '€/m²', 0);
-            set('k-tfnpk', 'k-tfnpk-trend', 'tfnpk', '%');
-            const f = avg(rows, 'faits'); document.getElementById('k-faits').textContent = f != null ? fmt(f, 0) : '—';
-            const e = avg(rows, 'ecoles1000'); document.getElementById('k-ecoles1000').textContent = e != null ? fmt(e, 2) : '—';
-            const s = avg(rows, 'sport1000'); document.getElementById('k-sport1000').textContent = s != null ? fmt(s, 2) : '—';
+
+            set('k-tfpb',        'k-tfpb-trend',        'tfpb',        '%');
+            set('k-prix',        'k-prix-trend',        'prix',        '\u20ac/m\u00b2', 0);
+            set('k-delinq',      'k-delinq-trend',      'delinq',      '\u2030');
+            set('k-teom',        'k-teom-trend',        'teom',        '%');
+            set('k-revenu',      'k-revenu-trend',      'revenu',      '\u20ac', 0);
+            set('k-fibre',       'k-fibre-trend',       'fibre',       '%', 1);
+            set('k-prix-appart', 'k-prix-appart-trend', 'prix_appart', '\u20ac/m\u00b2', 0);
+            set('k-tfnpk',       'k-tfnpk-trend',       'tfnpk',       '%');
+            set('k-pop',         'k-pop-trend',         'population',  '', 0);
+
+            const vFaits = aggregate(rows, 'faits');
+            const fFb = vFaits == null ? lastKnownValue(c, 'faits', a) : null;
+            document.getElementById('k-faits').textContent = vFaits != null ? fmt(vFaits, 0) : (fFb ? fmt(aggregate(fFb, 'faits'), 0) : '\u2014');
+
+            const vEcoles = aggregate(rows, 'ecoles1000');
+            document.getElementById('k-ecoles1000').textContent = vEcoles != null ? fmt(vEcoles, 2) : '\u2014';
+
+            const vSport = aggregate(rows, 'sport1000');
+            document.getElementById('k-sport1000').textContent = vSport != null ? fmt(vSport, 2) : '\u2014';
         }
 
         function seriesFor(key) {
