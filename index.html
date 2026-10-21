@@ -68,6 +68,12 @@
         .detail-item .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 700; }
         .detail-item .value { font-size: 16px; font-weight: 800; color: var(--blue-france); font-family: var(--font-mono); margin-top: 2px; }
         .detail-item .value.null { color: var(--grey-500); font-weight: 400; font-size: 12px; }
+        .kpi-fallback-badge {
+            display: inline-block; margin-left: 6px; padding: 1px 5px;
+            font-size: 9px; font-weight: 700; font-family: var(--font-mono);
+            background: var(--gold); color: #fff; border-radius: 3px;
+            vertical-align: middle; cursor: help;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -1039,7 +1045,8 @@
                 }
                 if (cur == null) { el.textContent = '\u2014'; el.title = 'Donnee non renseignee (' + key + ')'; }
                 else {
-                    el.textContent = fmt(cur, dec) + (unit ? ' ' + unit : '');
+                    el.innerHTML = fmt(cur, dec) + (unit ? ' ' + unit : '')
+                        + (isFallback ? '<span class="kpi-fallback-badge" title="Valeur ' + curYear + ' - non renseignee pour ' + a + '">' + curYear + '</span>' : '');
                     el.title = isFallback ? 'Valeur ' + curYear + ' (non renseignee pour ' + a + ')' : 'Valeur ' + curYear;
                 }
                 if (!trendEl) return;
@@ -1087,6 +1094,7 @@
             const maxYear = parseInt(document.getElementById('f-year-max').value);
             const annees = [...new Set(DATA.map(r=>r.annee))].filter(a => a >= minYear && a <= maxYear).sort((a,b)=>a-b);
             let datasets = [];
+
             const createDataset = (insee, colorIndex) => {
                 const nom = communesMap[insee] ? communesMap[insee].nom : 'Inconnue';
                 return {
@@ -1096,8 +1104,22 @@
                     tension: 0.35, pointRadius: 3, borderWidth: 2, spanGaps: true
                 };
             };
+
+            const createAggregateDataset = (colorIndex) => ({
+                label: 'Territoire 974', insee: '__TERRITOIRE__',
+                data: annees.map(a => {
+                    const rowsYear = DATA.filter(r => r.annee == a && r[key] != null);
+                    if (!rowsYear.length) return null;
+                    const vals = rowsYear.map(r => r[key]);
+                    if (SUM_METRICS.has(key)) return vals.reduce((s, x) => s + x, 0);
+                    return vals.reduce((s, x) => s + x, 0) / vals.length;
+                }),
+                borderColor: COLORS[colorIndex % COLORS.length], backgroundColor: COLORS[colorIndex % COLORS.length],
+                tension: 0.35, pointRadius: 3, borderWidth: 2, spanGaps: true
+            });
+
             if (c1) datasets.push(createDataset(c1, 0));
-            else Object.values(communesMap).sort((a,b)=>a.nom.localeCompare(b.nom)).slice(0, 4).forEach((c, i) => datasets.push(createDataset(c.insee, i)));
+            else datasets.push(createAggregateDataset(0));
             if (c2) datasets.push(createDataset(c2, 1));
             return { annees, datasets };
         }
@@ -1221,12 +1243,19 @@
 
         function exportCSV() {
             const rows = currentTableFiltered();
-            if (rows.length === 0) return alert("Aucune donnée à exporter.");
-            const cols = INDICATORS.filter(i => visibleCols.has(i.key));
-            const headers = ['Annee', 'Commune', 'INSEE', ...cols.map(c => c.src)];
+            if (rows.length === 0) return alert("Aucune donnee a exporter.");
+            const baseCols = INDICATORS.filter(i => visibleCols.has(i.key));
+            const calcCols = INDICATORS.filter(i => !visibleCols.has(i.key) && i.key.endsWith('1000'));
+            const allCols = [...baseCols, ...calcCols];
+            const headers = ['Annee', 'Commune', 'INSEE', ...allCols.map(c => c.src || c.key)];
             const csvRows = [headers.join(',')];
             rows.forEach(r => {
-                csvRows.push([r.annee, `"${r.commune}"`, r.insee, ...cols.map(c => r[c.key] ?? '')].join(','));
+                csvRows.push([
+                    r.annee,
+                    '"' + (r.commune || '').replace(/"/g, '""') + '"',
+                    r.insee,
+                    ...allCols.map(c => r[c.key] ?? '')
+                ].join(','));
             });
             const blob = new Blob(["\uFEFF" + csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
